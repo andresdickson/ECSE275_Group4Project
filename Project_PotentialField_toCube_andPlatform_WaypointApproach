@@ -314,9 +314,22 @@ if __name__ == '__main__':
     robot_1_link2 = sim.getObjectHandle("/IRB140[1]/link/joint")
     robot_1_link3 = sim.getObjectHandle("/IRB140[1]/link/joint/link/joint")
 
+    connector0 = sim.getObjectHandle('/IRB140[0]/connection/RG2/attachPoint')
+    objectSensor0 = sim.getObjectHandle('/IRB140[0]/attachPoint/Proximity_sensor')
+    attachedShape0 = None  # Keeps track of the currently attached object for Robot 0
 
-# loops until both arms are close to the cube
-##tweak threshold to come closer or further to the cube
+    connector1 = sim.getObjectHandle('/IRB140[1]/connection/RG2/attachPoint')
+    objectSensor1 = sim.getObjectHandle('/IRB140[1]/attachPoint/Proximity_sensor')
+    attachedShape1 = None  # Keeps track of the currently attached object for Robot 1
+
+    print('Connector0 Handle:', connector0, 'Name:', sim.getObjectName(connector0))
+    print('Object Sensor0 Handle:', objectSensor0, 'Name:', sim.getObjectName(objectSensor0))
+    print('Connector1 Handle:', connector1, 'Name:', sim.getObjectName(connector1))
+    print('Object Sensor1 Handle:', objectSensor1, 'Name:', sim.getObjectName(objectSensor1))
+
+
+    # loops until both arms are close to the cube
+    ##tweak threshold to come closer or further to the cube
     while (np.linalg.norm(robot0_world - cube0_world) > 0.05 or np.linalg.norm(robot1_world - cube1_world) > 0.05):
         # print("1")
         # print(np.linalg.norm(robot0_world - cube0_world))
@@ -362,6 +375,7 @@ if __name__ == '__main__':
         # Plot the positions on the grid map
         # plot_grid(robot1_world, robot2_world, goal1_world)
         # plot_joint_positions(dh_params_0, sim, robot0_base_world)
+        # plot_joint_positions(dh_params_0, sim, robot0_base_world)
 
         F_rep_EE0 = compute_reppotgrad(robot1_world, robot0_world)
         F_rep_link1_0 = compute_reppotgrad(robot_0_link1_midpoint, robot0_world)
@@ -390,7 +404,7 @@ if __name__ == '__main__':
         # plt.quiver(robot0_world[0], robot0_world[2], F_total_0[0], F_total_0[2], color='blue')
         # plt.quiver(robot1_world[0], robot1_world[2], F_total_1[0], F_total_1[2], color='green')
         # plt.show()  # Non-blocking in interactive mode
-       
+        
 
         if np.linalg.norm(robot0_world - cube0_world) < 0.01:
             robot0_joint_vel = np.zeros_like(robot0_joint_vel)
@@ -417,31 +431,261 @@ if __name__ == '__main__':
         # Wait before polling again
         time.sleep(0.01)
 
-# gripper code
-print("Cube reached")
 
-sim.setJointTargetVelocity(robot_0_link1, 0)
-sim.setJointTargetVelocity(robot_0_link2, 0)
-sim.setJointTargetVelocity(robot_0_link3, 0)
+    print("Cube reached")
 
-sim.setJointTargetVelocity(robot_1_link1, 0)
-sim.setJointTargetVelocity(robot_1_link2, 0)
-sim.setJointTargetVelocity(robot_1_link3, 0)
+    sim.setJointTargetVelocity(robot_0_link1, 0)
+    sim.setJointTargetVelocity(robot_0_link2, 0)
+    sim.setJointTargetVelocity(robot_0_link3, 0)
 
-plt.ion()
-fig, ax = plt.subplots()
-quiver_total_0 = None
-quiver_total_1 = None
-quivers_individual_0 = []  # List to hold individual force arrows for Robot 0
-quivers_individual_1 = []  # List to hold individual force arrows for Robot 1
-legend_items = []  # For dynamically adding legends
+    sim.setJointTargetVelocity(robot_1_link1, 0)
+    sim.setJointTargetVelocity(robot_1_link2, 0)
+    sim.setJointTargetVelocity(robot_1_link3, 0)
 
-waypoints = [(waypoint0_0, waypoint1_0), (waypoint0_1, waypoint1_1), (waypoint0_2, waypoint1_2)]
-for waypoint in waypoints:
-    while (np.linalg.norm(robot0_world - np.array(get_position(sim,waypoint[0]))) > 0.5 or np.linalg.norm(robot1_world - np.array(get_position(sim,waypoint[1]))) > 0.5):
+    #gripper code 
+    if attachedShape0 is None:
+            result0, detectedPoint0, detectedObjectHandle0, detectedSurfaceNormalVector0 = sim.readProximitySensor(objectSensor0)
+            if result0 > 0 and detectedObjectHandle0 != -1:
+                print('Robot 0 proximity sensor detected object:', sim.getObjectName(detectedObjectHandle0))
+                isStatic0 = sim.getObjectInt32Parameter(detectedObjectHandle0, sim.shapeintparam_static)
+                isRespondable0 = sim.getObjectInt32Parameter(detectedObjectHandle0, sim.shapeintparam_respondable)
+                print('Is Static:', isStatic0, 'Is Respondable:', isRespondable0)
+                if isStatic0 == 0 and isRespondable0 != 0:
+                    # Attach the detected object to the gripper
+                    attachedShape0 = detectedObjectHandle0
+                    sim.setObjectParent(attachedShape0, connector0, True)
+                    sim.writeCustomDataBlock(attachedShape0, 'attached', 'true')
+                    print('Robot 0 object attached:', sim.getObjectName(attachedShape0))
+                else:
+                    print('Detected object is not dynamic and respondable.')
+            else:
+                pass  # Optionally print 'Robot 0 proximity sensor did not detect any object.'
+
+        # Gripper code for Robot 1
+    if attachedShape1 is None:
+        result1, detectedPoint1, detectedObjectHandle1, detectedSurfaceNormalVector1 = sim.readProximitySensor(objectSensor1)
+        if result1 > 0 and detectedObjectHandle1 != -1:
+            print('Robot 1 proximity sensor detected object:', sim.getObjectName(detectedObjectHandle1))
+            isStatic1 = sim.getObjectInt32Parameter(detectedObjectHandle1, sim.shapeintparam_static)
+            isRespondable1 = sim.getObjectInt32Parameter(detectedObjectHandle1, sim.shapeintparam_respondable)
+            print('Is Static:', isStatic1, 'Is Respondable:', isRespondable1)
+            if isStatic1 == 0 and isRespondable1 != 0:
+                # Attach the detected object to the gripper
+                attachedShape1 = detectedObjectHandle1
+                sim.setObjectParent(attachedShape1, connector1, True)
+                sim.writeCustomDataBlock(attachedShape1, 'attached', 'true')
+                print('Robot 1 object attached:', sim.getObjectName(attachedShape1))
+            else:
+                print('Detected object is not dynamic and respondable.')
+        else:
+            pass  # Optionally print 'Robot 1 proximity sensor did not detect any object.'
+
+
+    plt.ion()
+    fig, ax = plt.subplots()
+    quiver_total_0 = None
+    quiver_total_1 = None
+    quivers_individual_0 = []  # List to hold individual force arrows for Robot 0
+    quivers_individual_1 = []  # List to hold individual force arrows for Robot 1
+    legend_items = []  # For dynamically adding legends
+
+    waypoints = [(waypoint0_0, waypoint1_0), (waypoint0_1, waypoint1_1), (waypoint0_2, waypoint1_2)]
+    for waypoint in waypoints:
+        while (np.linalg.norm(robot0_world - np.array(get_position(sim,waypoint[0]))) > 0.5 or np.linalg.norm(robot1_world - np.array(get_position(sim,waypoint[1]))) > 0.5):
+            # Poll positions of end effectors and target
+            waypoint0 = np.array(get_position(sim,waypoint[0]))
+            waypoint1 = np.array(get_position(sim,waypoint[1]))
+            robot0_world = np.array(get_position(sim, robot0_EE))
+            robot1_world = np.array(get_position(sim, robot1_EE))
+
+            robot0_link1_pos = sim.getJointPosition(robot_0_link1)
+            robot0_link2_pos = sim.getJointPosition(robot_0_link2)
+            robot0_link3_pos = sim.getJointPosition(robot_0_link3)
+
+            robot1_link1_pos = sim.getJointPosition(robot_1_link1)
+            robot1_link2_pos = sim.getJointPosition(robot_1_link2)
+            robot1_link3_pos = sim.getJointPosition(robot_1_link3)
+
+            dh_params_0 = [
+            (0, 0, 0.352, robot0_link1_pos, 0),  # Link 1
+            (np.pi / 2, 0.070, 0, robot0_link2_pos, np.pi / 2),  # Link 2
+            (0, 0.360, 0, robot0_link3_pos, 0),   # Link 3
+            (np.pi / 2, 0, 0.574, 0, 0)   # Link 4
+        ]
+            dh_params_1 = [
+            (0, 0, 0.352, robot1_link1_pos, 0),  # Link 1
+            (np.pi / 2, 0.070, 0, robot1_link2_pos, np.pi / 2),  # Link 2
+            (0, 0.360, 0, robot1_link3_pos, 0),   # Link 3
+            (np.pi / 2, 0, 0.574, 0, 0)   # Link 4
+        ]
+
+            robot_0_link1_midpoint = compute_midpoint_DH(dh_params_0, 1, robot0_base_world)
+            robot_0_link2_midpoint = compute_midpoint_DH(dh_params_0, 2, robot0_base_world)
+            robot_0_link3_midpoint = compute_midpoint_DH(dh_params_0, 3, robot0_base_world)
+
+            
+            robot_1_link1_midpoint = compute_midpoint_DH(dh_params_1, 1, robot1_base_world)
+            robot_1_link2_midpoint = compute_midpoint_DH(dh_params_1, 2, robot1_base_world)
+            robot_1_link3_midpoint = compute_midpoint_DH(dh_params_1, 3, robot1_base_world)
+            # plot_joint_positions(dh_params_0, sim, robot0_base_world)
+            # plot_joint_positions(dh_params_1, sim, robot1_base_world)
+
+            # F_rep_floor_0 = compute_reppotgrad(floor5_world, robot0_world, min_thresh= 0.01, max_thresh=0.1)
+            F_rep_EE0 = compute_reppotgrad(robot1_world, robot0_world, min_thresh= 0.001, max_thresh=0.005)
+            F_rep_platform0_face = compute_reppotgrad(platform0_face_world, robot0_world, eps=10, min_thresh= 0, max_thresh=0.2)
+            F_rep_base_0 = compute_reppotgrad(robot0_base_world, robot0_world, eps=10,  min_thresh= 0, max_thresh=0.7)
+            F_rep_link1_0 = compute_reppotgrad(robot_0_link1_midpoint, robot0_world, eps= 20, min_thresh= 0, max_thresh=0.1)
+            F_rep_link2_0 = compute_reppotgrad(robot_0_link2_midpoint, robot0_world, eps= 20, min_thresh= 0, max_thresh=0.01)
+            F_rep_link3_0 = compute_reppotgrad(robot_0_link3_midpoint, robot0_world, eps= 20, min_thresh= 0, max_thresh=0.01)
+
+            F_rep_floor1_1 = compute_reppotgrad(floor1_world, robot1_world, eps=0.01, min_thresh= 0.01, max_thresh=0.2)
+            # F_rep_floor2_1 = compute_reppotgrad(floor2_world, robot1_world, eps=1, min_thresh= 0.01, max_thresh=0.01)
+            # F_rep_floor3_1 = compute_reppotgrad(floor3_world, robot1_world, eps=1, min_thresh= 0.01, max_thresh=0.01)
+            # F_rep_floor4_1 = compute_reppotgrad(floor4_world, robot1_world, eps=1, min_thresh= 0.01, max_thresh=0.05)
+            F_rep_EE1 = compute_reppotgrad(robot0_world, robot1_world, min_thresh= 0.001, max_thresh=0.005)
+            F_rep_platform1_face = compute_reppotgrad(platform1_face_world, robot1_world, min_thresh= 0, max_thresh=0.12)
+            F_rep_base_1 = compute_reppotgrad(robot1_base_world, robot1_world, min_thresh= 0, max_thresh=0.1)
+            F_rep_link1_1 = compute_reppotgrad(robot_1_link1_midpoint, robot1_world, min_thresh= 0, max_thresh=0.005)
+            F_rep_link2_1 = compute_reppotgrad(robot_1_link2_midpoint, robot1_world, min_thresh= 0, max_thresh=0.005)
+            F_rep_link3_1 = compute_reppotgrad(robot_1_link3_midpoint, robot1_world, min_thresh= 0, max_thresh=0.005)
+
+            F_att_0 = compute_attpotgrad(waypoint0, robot0_world, max_thresh=0.1, eps2 = 100)
+            F_att_1 = compute_attpotgrad(waypoint1, robot1_world, max_thresh=0.1, eps2 = 100)
+
+            J0 = compute_jacobian(robot0_link1_pos, robot0_link2_pos, robot0_link3_pos, 0.352, 0.070, 0.360, 0.574) #account for length of gripper
+            J1 = compute_jacobian(robot1_link1_pos, robot1_link2_pos, robot1_link3_pos, 0.352, 0.070, 0.360, 0.574)
+
+            alpha_att = 1.0
+            beta_rep = 1.0
+            F_total_0 = -alpha_att * F_att_0 - beta_rep * (F_rep_EE0 + F_rep_link1_0 + F_rep_link2_0 + F_rep_link3_0 + F_rep_base_0)
+            # print(F_total_1)
+            # F_total_0[1] = 0
+            F_total_1 = -alpha_att * F_att_1 - beta_rep * (F_rep_EE1 + F_rep_link1_1 + F_rep_link2_1 + F_rep_link3_1 + F_rep_base_1 + F_rep_floor1_1)
+            # F_total_1[1] = 0
+
+            if F_total_0.ndim == 0:
+                F_total_0 = np.zeros(3)
+            if F_total_1.ndim == 0:
+                F_total_1 = np.zeros(3)
+            F_total_0[1] = 0
+            F_total_1[1] = 0
+
+            # Clear existing quivers from the plot
+            if quiver_total_0:
+                quiver_total_0.remove()
+            if quiver_total_1:
+                quiver_total_1.remove()
+            for q in quivers_individual_0:
+                q.remove()
+            for q in quivers_individual_1:
+                q.remove()
+            quivers_individual_0.clear()
+            quivers_individual_1.clear()
+
+            # Plot total forces
+            quiver_total_0 = ax.quiver(robot0_world[0], robot0_world[2], F_total_0[0], F_total_0[2],
+                                    color='blue', scale=1, scale_units='xy', label='Total Force Robot 0')
+            quiver_total_1 = ax.quiver(robot1_world[0], robot1_world[2], F_total_1[0], F_total_1[2],
+                                    color='green', scale=1, scale_units='xy', label='Total Force Robot 1')
+
+            # Plot individual forces dynamically for Robot 0
+            individual_forces_0 = {
+                "Attractive Force Robot 0": F_att_0,
+                "Repulsive EE Force Robot 0": F_rep_EE0,
+                "Repulsive Link1 Force Robot 0": F_rep_link1_0,
+                "Repulsive Link2 Force Robot 0": F_rep_link2_0,
+                "Repulsive Link3 Force Robot 0": F_rep_link3_0,
+                "Repulsive Base Force Robot 0": F_rep_base_0,
+                # "Repulsive Face Force Robot 0": F_rep_platform0_face,
+                # "Repulsive Floor Force Robot 0": F_rep_floor_0
+
+            }
+
+            for label, F_ind in individual_forces_0.items():
+                F_ind = np.array(F_ind)
+                if F_ind.ndim == 0:  # Handle scalars
+                    F_ind = np.zeros(3)
+                F_ind[1] = 0  # Ignore y-axis
+                quivers_individual_0.append(ax.quiver(robot0_world[0], robot0_world[2], F_ind[0], F_ind[2],
+                                                    color='red', alpha=0.5, scale=1, scale_units='xy', label=label))
+
+            # Plot individual forces dynamically for Robot 1
+            individual_forces_1 = {
+                "Attractive Force Robot 1": F_att_1,
+                "Repulsive EE Force Robot 1": F_rep_EE1,
+                "Repulsive Link1 Force Robot 1": F_rep_link1_1,
+                "Repulsive Link2 Force Robot 1": F_rep_link2_1,
+                "Repulsive Link3 Force Robot 1": F_rep_link3_1,
+                "Repulsive Base Force Robot 1": F_rep_base_1,
+                # "Repulsive Face Force Robot 1": F_rep_platform1_face,
+                "Repulsive Floor1 Force Robot 1": F_rep_floor1_1,
+                # "Repulsive Floor2 Force Robot 1": F_rep_floor2_1,
+                # "Repulsive Floor3 Force Robot 1": F_rep_floor3_1,
+                # "Repulsive Floor4 Force Robot 1": F_rep_floor4_1
+            }
+
+            for label, F_ind in individual_forces_1.items():
+                F_ind = np.array(F_ind)
+                if F_ind.ndim == 0:  # Handle scalars
+                    F_ind = np.zeros(3)
+                F_ind[1] = 0  # Ignore y-axis
+                quivers_individual_1.append(ax.quiver(robot1_world[0], robot1_world[2], F_ind[0], F_ind[2],
+                                                    color='orange', alpha=0.5, scale=1, scale_units='xy', label=label))
+
+            # Update plot settings
+            ax.set_xlim(-10, 10)
+            ax.set_ylim(-10, 10)
+            ax.set_title("Force Vectors Acting on Robot End Effectors")
+            ax.set_xlabel("X Position")
+            ax.set_ylabel("Z Position")
+            ax.grid(True)
+
+            # Display legend only once
+            if not ax.get_legend():
+                ax.legend(loc="upper left", fontsize="small", ncol=2)
+
+            plt.pause(0.01)
+
+            if np.linalg.norm(robot0_world - platform0_world) < 0.01:
+                robot0_joint_vel = np.zeros_like(robot0_joint_vel)
+                robot1_joint_vel = np.matmul(J1.transpose(), F_total_1)
+            elif np.linalg.norm(robot1_world - platform1_world) < 0.01:
+                robot0_joint_vel = np.matmul(J0.transpose(), F_total_0)
+                robot1_joint_vel = np.zeros_like(robot1_joint_vel)
+            else:
+                robot0_joint_vel = np.matmul(J0.transpose(), F_total_0)
+                robot1_joint_vel = np.matmul(J1.transpose(), F_total_1)
+
+            max_velocity = 0.1  # Adjust as needed
+            robot0_joint_vel = max_velocity * (robot0_joint_vel / np.linalg.norm(robot0_joint_vel))
+            robot1_joint_vel = max_velocity * (robot1_joint_vel / np.linalg.norm(robot1_joint_vel))
+
+            sim.setJointTargetVelocity(robot_0_link1, robot0_joint_vel[0])
+            sim.setJointTargetVelocity(robot_0_link2, robot0_joint_vel[1])
+            sim.setJointTargetVelocity(robot_0_link3, robot0_joint_vel[2])
+
+            sim.setJointTargetVelocity(robot_1_link1, -robot1_joint_vel[0])
+            sim.setJointTargetVelocity(robot_1_link2, -robot1_joint_vel[1])
+            sim.setJointTargetVelocity(robot_1_link3, -robot1_joint_vel[2])
+
+            # Wait before polling again
+            time.sleep(0.01)
+
+
+
+    fig, ax = plt.subplots()
+    quiver_total_0 = None
+    quiver_total_1 = None
+    quivers_individual_0 = []  # List to hold individual force arrows for Robot 0
+    quivers_individual_1 = []  # List to hold individual force arrows for Robot 1
+    legend_items = []  # For dynamically adding legends
+
+    # loops until both arms are close to the cube
+    ##tweak threshold to come closer or further to the cube
+    while (np.linalg.norm(robot0_world - platform0_world) > 0.2 or np.linalg.norm(robot1_world - platform1_world) > 0.2):
         # Poll positions of end effectors and target
-        waypoint0 = np.array(get_position(sim,waypoint[0]))
-        waypoint1 = np.array(get_position(sim,waypoint[1]))
+        platform0_world = np.array(get_position(sim,platform_0))
+        platform1_world = np.array(get_position(sim,platform_1))
         robot0_world = np.array(get_position(sim, robot0_EE))
         robot1_world = np.array(get_position(sim, robot1_EE))
 
@@ -470,7 +714,6 @@ for waypoint in waypoints:
         robot_0_link2_midpoint = compute_midpoint_DH(dh_params_0, 2, robot0_base_world)
         robot_0_link3_midpoint = compute_midpoint_DH(dh_params_0, 3, robot0_base_world)
 
-        
         robot_1_link1_midpoint = compute_midpoint_DH(dh_params_1, 1, robot1_base_world)
         robot_1_link2_midpoint = compute_midpoint_DH(dh_params_1, 2, robot1_base_world)
         robot_1_link3_midpoint = compute_midpoint_DH(dh_params_1, 3, robot1_base_world)
@@ -496,18 +739,18 @@ for waypoint in waypoints:
         F_rep_link2_1 = compute_reppotgrad(robot_1_link2_midpoint, robot1_world, min_thresh= 0, max_thresh=0.005)
         F_rep_link3_1 = compute_reppotgrad(robot_1_link3_midpoint, robot1_world, min_thresh= 0, max_thresh=0.005)
 
-        F_att_0 = compute_attpotgrad(waypoint0, robot0_world, max_thresh=0.1, eps2 = 100)
-        F_att_1 = compute_attpotgrad(waypoint1, robot1_world, max_thresh=0.1, eps2 = 100)
+        F_att_0 = compute_attpotgrad(platform0_world, robot0_world, max_thresh=0.1, eps2 = 100)
+        F_att_1 = compute_attpotgrad(platform1_world, robot1_world, max_thresh=0.1, eps2 = 100)
 
         J0 = compute_jacobian(robot0_link1_pos, robot0_link2_pos, robot0_link3_pos, 0.352, 0.070, 0.360, 0.574) #account for length of gripper
         J1 = compute_jacobian(robot1_link1_pos, robot1_link2_pos, robot1_link3_pos, 0.352, 0.070, 0.360, 0.574)
 
         alpha_att = 1.0
         beta_rep = 1.0
-        F_total_0 = -alpha_att * F_att_0 - beta_rep * (F_rep_EE0 + F_rep_link1_0 + F_rep_link2_0 + F_rep_link3_0 + F_rep_base_0)
+        F_total_0 = -alpha_att * F_att_0 - beta_rep * (F_rep_EE0 + F_rep_link1_0 + F_rep_link2_0 + F_rep_link3_0 + F_rep_base_0 + F_rep_platform0_face)
         # print(F_total_1)
         # F_total_0[1] = 0
-        F_total_1 = -alpha_att * F_att_1 - beta_rep * (F_rep_EE1 + F_rep_link1_1 + F_rep_link2_1 + F_rep_link3_1 + F_rep_base_1 + F_rep_floor1_1)
+        F_total_1 = -alpha_att * F_att_1 - beta_rep * (F_rep_EE1 + F_rep_link1_1 + F_rep_link2_1 + F_rep_link3_1 + F_rep_base_1 + F_rep_platform1_face + F_rep_floor1_1)
         # F_total_1[1] = 0
 
         if F_total_0.ndim == 0:
@@ -543,7 +786,7 @@ for waypoint in waypoints:
             "Repulsive Link2 Force Robot 0": F_rep_link2_0,
             "Repulsive Link3 Force Robot 0": F_rep_link3_0,
             "Repulsive Base Force Robot 0": F_rep_base_0,
-            # "Repulsive Face Force Robot 0": F_rep_platform0_face,
+            "Repulsive Face Force Robot 0": F_rep_platform0_face,
             # "Repulsive Floor Force Robot 0": F_rep_floor_0
 
         }
@@ -564,7 +807,7 @@ for waypoint in waypoints:
             "Repulsive Link2 Force Robot 1": F_rep_link2_1,
             "Repulsive Link3 Force Robot 1": F_rep_link3_1,
             "Repulsive Base Force Robot 1": F_rep_base_1,
-            # "Repulsive Face Force Robot 1": F_rep_platform1_face,
+            "Repulsive Face Force Robot 1": F_rep_platform1_face,
             "Repulsive Floor1 Force Robot 1": F_rep_floor1_1,
             # "Repulsive Floor2 Force Robot 1": F_rep_floor2_1,
             # "Repulsive Floor3 Force Robot 1": F_rep_floor3_1,
@@ -593,10 +836,10 @@ for waypoint in waypoints:
 
         plt.pause(0.01)
 
-        if np.linalg.norm(robot0_world - platform0_world) < 0.01:
+        if np.linalg.norm(robot0_world - platform0_world) < 0.2:
             robot0_joint_vel = np.zeros_like(robot0_joint_vel)
             robot1_joint_vel = np.matmul(J1.transpose(), F_total_1)
-        elif np.linalg.norm(robot1_world - platform1_world) < 0.01:
+        elif np.linalg.norm(robot1_world - platform1_world) < 0.2:
             robot0_joint_vel = np.matmul(J0.transpose(), F_total_0)
             robot1_joint_vel = np.zeros_like(robot1_joint_vel)
         else:
@@ -618,206 +861,16 @@ for waypoint in waypoints:
         # Wait before polling again
         time.sleep(0.01)
 
+        sim.setJointTargetVelocity(robot_0_link1, 0)
+        sim.setJointTargetVelocity(robot_0_link2, 0)
+        sim.setJointTargetVelocity(robot_0_link3, 0)
 
+        sim.setJointTargetVelocity(robot_1_link1, 0)
+        sim.setJointTargetVelocity(robot_1_link2, 0)
+        sim.setJointTargetVelocity(robot_1_link3, 0)
 
-fig, ax = plt.subplots()
-quiver_total_0 = None
-quiver_total_1 = None
-quivers_individual_0 = []  # List to hold individual force arrows for Robot 0
-quivers_individual_1 = []  # List to hold individual force arrows for Robot 1
-legend_items = []  # For dynamically adding legends
+        print("Target reached")
+        #gripper release
 
-# loops until both arms are close to the cube
-##tweak threshold to come closer or further to the cube
-while (np.linalg.norm(robot0_world - platform0_world) > 0.2 or np.linalg.norm(robot1_world - platform1_world) > 0.2):
-    # Poll positions of end effectors and target
-    platform0_world = np.array(get_position(sim,platform_0))
-    platform1_world = np.array(get_position(sim,platform_1))
-    robot0_world = np.array(get_position(sim, robot0_EE))
-    robot1_world = np.array(get_position(sim, robot1_EE))
-
-    robot0_link1_pos = sim.getJointPosition(robot_0_link1)
-    robot0_link2_pos = sim.getJointPosition(robot_0_link2)
-    robot0_link3_pos = sim.getJointPosition(robot_0_link3)
-
-    robot1_link1_pos = sim.getJointPosition(robot_1_link1)
-    robot1_link2_pos = sim.getJointPosition(robot_1_link2)
-    robot1_link3_pos = sim.getJointPosition(robot_1_link3)
-
-    dh_params_0 = [
-    (0, 0, 0.352, robot0_link1_pos, 0),  # Link 1
-    (np.pi / 2, 0.070, 0, robot0_link2_pos, np.pi / 2),  # Link 2
-    (0, 0.360, 0, robot0_link3_pos, 0),   # Link 3
-    (np.pi / 2, 0, 0.574, 0, 0)   # Link 4
-]
-    dh_params_1 = [
-    (0, 0, 0.352, robot1_link1_pos, 0),  # Link 1
-    (np.pi / 2, 0.070, 0, robot1_link2_pos, np.pi / 2),  # Link 2
-    (0, 0.360, 0, robot1_link3_pos, 0),   # Link 3
-    (np.pi / 2, 0, 0.574, 0, 0)   # Link 4
-]
-
-    robot_0_link1_midpoint = compute_midpoint_DH(dh_params_0, 1, robot0_base_world)
-    robot_0_link2_midpoint = compute_midpoint_DH(dh_params_0, 2, robot0_base_world)
-    robot_0_link3_midpoint = compute_midpoint_DH(dh_params_0, 3, robot0_base_world)
-
-    robot_1_link1_midpoint = compute_midpoint_DH(dh_params_1, 1, robot1_base_world)
-    robot_1_link2_midpoint = compute_midpoint_DH(dh_params_1, 2, robot1_base_world)
-    robot_1_link3_midpoint = compute_midpoint_DH(dh_params_1, 3, robot1_base_world)
-    # Plot the positions on the grid map
-    # plot_grid(robot1_world, robot2_world, goal1_world)
-
-    # F_rep_floor_0 = compute_reppotgrad(floor5_world, robot0_world, min_thresh= 0.01, max_thresh=0.1)
-    F_rep_EE0 = compute_reppotgrad(robot1_world, robot0_world, min_thresh= 0.001, max_thresh=0.005)
-    F_rep_platform0_face = compute_reppotgrad(platform0_face_world, robot0_world, eps=10, min_thresh= 0, max_thresh=0.2)
-    F_rep_base_0 = compute_reppotgrad(robot0_base_world, robot0_world, eps=10,  min_thresh= 0, max_thresh=0.7)
-    F_rep_link1_0 = compute_reppotgrad(robot_0_link1_midpoint, robot0_world, eps= 20, min_thresh= 0, max_thresh=0.1)
-    F_rep_link2_0 = compute_reppotgrad(robot_0_link2_midpoint, robot0_world, eps= 20, min_thresh= 0, max_thresh=0.01)
-    F_rep_link3_0 = compute_reppotgrad(robot_0_link3_midpoint, robot0_world, eps= 20, min_thresh= 0, max_thresh=0.01)
-
-    F_rep_floor1_1 = compute_reppotgrad(floor1_world, robot1_world, eps=0.01, min_thresh= 0.01, max_thresh=0.2)
-    # F_rep_floor2_1 = compute_reppotgrad(floor2_world, robot1_world, eps=1, min_thresh= 0.01, max_thresh=0.01)
-    # F_rep_floor3_1 = compute_reppotgrad(floor3_world, robot1_world, eps=1, min_thresh= 0.01, max_thresh=0.01)
-    # F_rep_floor4_1 = compute_reppotgrad(floor4_world, robot1_world, eps=1, min_thresh= 0.01, max_thresh=0.05)
-    F_rep_EE1 = compute_reppotgrad(robot0_world, robot1_world, min_thresh= 0.001, max_thresh=0.005)
-    F_rep_platform1_face = compute_reppotgrad(platform1_face_world, robot1_world, min_thresh= 0, max_thresh=0.12)
-    F_rep_base_1 = compute_reppotgrad(robot1_base_world, robot1_world, min_thresh= 0, max_thresh=0.1)
-    F_rep_link1_1 = compute_reppotgrad(robot_1_link1_midpoint, robot1_world, min_thresh= 0, max_thresh=0.005)
-    F_rep_link2_1 = compute_reppotgrad(robot_1_link2_midpoint, robot1_world, min_thresh= 0, max_thresh=0.005)
-    F_rep_link3_1 = compute_reppotgrad(robot_1_link3_midpoint, robot1_world, min_thresh= 0, max_thresh=0.005)
-
-    F_att_0 = compute_attpotgrad(platform0_world, robot0_world, max_thresh=0.1, eps2 = 100)
-    F_att_1 = compute_attpotgrad(platform1_world, robot1_world, max_thresh=0.1, eps2 = 100)
-
-    J0 = compute_jacobian(robot0_link1_pos, robot0_link2_pos, robot0_link3_pos, 0.352, 0.070, 0.360, 0.574) #account for length of gripper
-    J1 = compute_jacobian(robot1_link1_pos, robot1_link2_pos, robot1_link3_pos, 0.352, 0.070, 0.360, 0.574)
-
-    alpha_att = 1.0
-    beta_rep = 1.0
-    F_total_0 = -alpha_att * F_att_0 - beta_rep * (F_rep_EE0 + F_rep_link1_0 + F_rep_link2_0 + F_rep_link3_0 + F_rep_base_0 + F_rep_platform0_face)
-    # print(F_total_1)
-    # F_total_0[1] = 0
-    F_total_1 = -alpha_att * F_att_1 - beta_rep * (F_rep_EE1 + F_rep_link1_1 + F_rep_link2_1 + F_rep_link3_1 + F_rep_base_1 + F_rep_platform1_face + F_rep_floor1_1)
-    # F_total_1[1] = 0
-
-    if F_total_0.ndim == 0:
-        F_total_0 = np.zeros(3)
-    if F_total_1.ndim == 0:
-        F_total_1 = np.zeros(3)
-    F_total_0[1] = 0
-    F_total_1[1] = 0
-
-    # Clear existing quivers from the plot
-    if quiver_total_0:
-        quiver_total_0.remove()
-    if quiver_total_1:
-        quiver_total_1.remove()
-    for q in quivers_individual_0:
-        q.remove()
-    for q in quivers_individual_1:
-        q.remove()
-    quivers_individual_0.clear()
-    quivers_individual_1.clear()
-
-    # Plot total forces
-    quiver_total_0 = ax.quiver(robot0_world[0], robot0_world[2], F_total_0[0], F_total_0[2],
-                               color='blue', scale=1, scale_units='xy', label='Total Force Robot 0')
-    quiver_total_1 = ax.quiver(robot1_world[0], robot1_world[2], F_total_1[0], F_total_1[2],
-                               color='green', scale=1, scale_units='xy', label='Total Force Robot 1')
-
-    # Plot individual forces dynamically for Robot 0
-    individual_forces_0 = {
-        "Attractive Force Robot 0": F_att_0,
-        "Repulsive EE Force Robot 0": F_rep_EE0,
-        "Repulsive Link1 Force Robot 0": F_rep_link1_0,
-        "Repulsive Link2 Force Robot 0": F_rep_link2_0,
-        "Repulsive Link3 Force Robot 0": F_rep_link3_0,
-        "Repulsive Base Force Robot 0": F_rep_base_0,
-        "Repulsive Face Force Robot 0": F_rep_platform0_face,
-        # "Repulsive Floor Force Robot 0": F_rep_floor_0
-
-    }
-
-    for label, F_ind in individual_forces_0.items():
-        F_ind = np.array(F_ind)
-        if F_ind.ndim == 0:  # Handle scalars
-            F_ind = np.zeros(3)
-        F_ind[1] = 0  # Ignore y-axis
-        quivers_individual_0.append(ax.quiver(robot0_world[0], robot0_world[2], F_ind[0], F_ind[2],
-                                              color='red', alpha=0.5, scale=1, scale_units='xy', label=label))
-
-    # Plot individual forces dynamically for Robot 1
-    individual_forces_1 = {
-        "Attractive Force Robot 1": F_att_1,
-        "Repulsive EE Force Robot 1": F_rep_EE1,
-        "Repulsive Link1 Force Robot 1": F_rep_link1_1,
-        "Repulsive Link2 Force Robot 1": F_rep_link2_1,
-        "Repulsive Link3 Force Robot 1": F_rep_link3_1,
-        "Repulsive Base Force Robot 1": F_rep_base_1,
-        "Repulsive Face Force Robot 1": F_rep_platform1_face,
-        "Repulsive Floor1 Force Robot 1": F_rep_floor1_1,
-        # "Repulsive Floor2 Force Robot 1": F_rep_floor2_1,
-        # "Repulsive Floor3 Force Robot 1": F_rep_floor3_1,
-        # "Repulsive Floor4 Force Robot 1": F_rep_floor4_1
-    }
-
-    for label, F_ind in individual_forces_1.items():
-        F_ind = np.array(F_ind)
-        if F_ind.ndim == 0:  # Handle scalars
-            F_ind = np.zeros(3)
-        F_ind[1] = 0  # Ignore y-axis
-        quivers_individual_1.append(ax.quiver(robot1_world[0], robot1_world[2], F_ind[0], F_ind[2],
-                                              color='orange', alpha=0.5, scale=1, scale_units='xy', label=label))
-
-    # Update plot settings
-    ax.set_xlim(-5, 5)
-    ax.set_ylim(-5, 5)
-    ax.set_title("Force Vectors Acting on Robot End Effectors")
-    ax.set_xlabel("X Position")
-    ax.set_ylabel("Z Position")
-    ax.grid(True)
-
-    # Display legend only once
-    if not ax.get_legend():
-        ax.legend(loc="upper left", fontsize="small", ncol=2)
-
-    plt.pause(0.01)
-
-    if np.linalg.norm(robot0_world - platform0_world) < 0.01:
-        robot0_joint_vel = np.zeros_like(robot0_joint_vel)
-        robot1_joint_vel = np.matmul(J1.transpose(), F_total_1)
-    elif np.linalg.norm(robot1_world - platform1_world) < 0.01:
-        robot0_joint_vel = np.matmul(J0.transpose(), F_total_0)
-        robot1_joint_vel = np.zeros_like(robot1_joint_vel)
-    else:
-        robot0_joint_vel = np.matmul(J0.transpose(), F_total_0)
-        robot1_joint_vel = np.matmul(J1.transpose(), F_total_1)
-
-    max_velocity = 0.1  # Adjust as needed
-    robot0_joint_vel = max_velocity * (robot0_joint_vel / np.linalg.norm(robot0_joint_vel))
-    robot1_joint_vel = max_velocity * (robot1_joint_vel / np.linalg.norm(robot1_joint_vel))
-
-    sim.setJointTargetVelocity(robot_0_link1, robot0_joint_vel[0])
-    sim.setJointTargetVelocity(robot_0_link2, robot0_joint_vel[1])
-    sim.setJointTargetVelocity(robot_0_link3, robot0_joint_vel[2])
-
-    sim.setJointTargetVelocity(robot_1_link1, -robot1_joint_vel[0])
-    sim.setJointTargetVelocity(robot_1_link2, -robot1_joint_vel[1])
-    sim.setJointTargetVelocity(robot_1_link3, -robot1_joint_vel[2])
-
-    # Wait before polling again
-    time.sleep(0.01)
-
-    sim.setJointTargetVelocity(robot_0_link1, 0)
-    sim.setJointTargetVelocity(robot_0_link2, 0)
-    sim.setJointTargetVelocity(robot_0_link3, 0)
-
-    sim.setJointTargetVelocity(robot_1_link1, 0)
-    sim.setJointTargetVelocity(robot_1_link2, 0)
-    sim.setJointTargetVelocity(robot_1_link3, 0)
-
-    print("Target reached")
-    #gripper release
-
-plt.ioff()
-plt.show()
+    plt.ioff()
+    plt.show()
