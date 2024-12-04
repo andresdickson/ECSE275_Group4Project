@@ -418,7 +418,15 @@ if __name__ == '__main__':
         time.sleep(0.01)
 
 # gripper code
-print("loop exited")
+print("Cube reached")
+
+sim.setJointTargetVelocity(robot_0_link1, 0)
+sim.setJointTargetVelocity(robot_0_link2, 0)
+sim.setJointTargetVelocity(robot_0_link3, 0)
+
+sim.setJointTargetVelocity(robot_1_link1, 0)
+sim.setJointTargetVelocity(robot_1_link2, 0)
+sim.setJointTargetVelocity(robot_1_link3, 0)
 
 plt.ion()
 fig, ax = plt.subplots()
@@ -611,6 +619,7 @@ for waypoint in waypoints:
         time.sleep(0.01)
 
 
+
 fig, ax = plt.subplots()
 quiver_total_0 = None
 quiver_total_1 = None
@@ -620,7 +629,7 @@ legend_items = []  # For dynamically adding legends
 
 # loops until both arms are close to the cube
 ##tweak threshold to come closer or further to the cube
-while (np.linalg.norm(robot0_world - platform0_world) > 0.1 or np.linalg.norm(robot1_world - platform1_world) > 0.1):
+while (np.linalg.norm(robot0_world - platform0_world) > 0.2 or np.linalg.norm(robot1_world - platform1_world) > 0.2):
     # Poll positions of end effectors and target
     platform0_world = np.array(get_position(sim,platform_0))
     platform1_world = np.array(get_position(sim,platform_1))
@@ -798,6 +807,17 @@ while (np.linalg.norm(robot0_world - platform0_world) > 0.1 or np.linalg.norm(ro
 
     # Wait before polling again
     time.sleep(0.01)
+
+    sim.setJointTargetVelocity(robot_0_link1, 0)
+    sim.setJointTargetVelocity(robot_0_link2, 0)
+    sim.setJointTargetVelocity(robot_0_link3, 0)
+
+    sim.setJointTargetVelocity(robot_1_link1, 0)
+    sim.setJointTargetVelocity(robot_1_link2, 0)
+    sim.setJointTargetVelocity(robot_1_link3, 0)
+
+    print("Target reached")
+    #gripper release
 
 plt.ioff()
 plt.show()
