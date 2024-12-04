@@ -314,20 +314,6 @@ if __name__ == '__main__':
     robot_1_link2 = sim.getObjectHandle("/IRB140[1]/link/joint")
     robot_1_link3 = sim.getObjectHandle("/IRB140[1]/link/joint/link/joint")
 
-    connector0 = sim.getObjectHandle('/IRB140[0]/connection/RG2/attachPoint')
-    objectSensor0 = sim.getObjectHandle('/IRB140[0]/attachPoint/Proximity_sensor')
-    attachedShape0 = None  # Keeps track of the currently attached object for Robot 0
-
-    connector1 = sim.getObjectHandle('/IRB140[1]/connection/RG2/attachPoint')
-    objectSensor1 = sim.getObjectHandle('/IRB140[1]/attachPoint/Proximity_sensor')
-    attachedShape1 = None  # Keeps track of the currently attached object for Robot 1
-
-    print('Connector0 Handle:', connector0, 'Name:', sim.getObjectName(connector0))
-    print('Object Sensor0 Handle:', objectSensor0, 'Name:', sim.getObjectName(objectSensor0))
-    print('Connector1 Handle:', connector1, 'Name:', sim.getObjectName(connector1))
-    print('Object Sensor1 Handle:', objectSensor1, 'Name:', sim.getObjectName(objectSensor1))
-
-
     # loops until both arms are close to the cube
     ##tweak threshold to come closer or further to the cube
     while (np.linalg.norm(robot0_world - cube0_world) > 0.05 or np.linalg.norm(robot1_world - cube1_world) > 0.05):
@@ -441,45 +427,6 @@ if __name__ == '__main__':
     sim.setJointTargetVelocity(robot_1_link1, 0)
     sim.setJointTargetVelocity(robot_1_link2, 0)
     sim.setJointTargetVelocity(robot_1_link3, 0)
-
-    #gripper code 
-    if attachedShape0 is None:
-            result0, detectedPoint0, detectedObjectHandle0, detectedSurfaceNormalVector0 = sim.readProximitySensor(objectSensor0)
-            if result0 > 0 and detectedObjectHandle0 != -1:
-                print('Robot 0 proximity sensor detected object:', sim.getObjectName(detectedObjectHandle0))
-                isStatic0 = sim.getObjectInt32Parameter(detectedObjectHandle0, sim.shapeintparam_static)
-                isRespondable0 = sim.getObjectInt32Parameter(detectedObjectHandle0, sim.shapeintparam_respondable)
-                print('Is Static:', isStatic0, 'Is Respondable:', isRespondable0)
-                if isStatic0 == 0 and isRespondable0 != 0:
-                    # Attach the detected object to the gripper
-                    attachedShape0 = detectedObjectHandle0
-                    sim.setObjectParent(attachedShape0, connector0, True)
-                    sim.writeCustomDataBlock(attachedShape0, 'attached', 'true')
-                    print('Robot 0 object attached:', sim.getObjectName(attachedShape0))
-                else:
-                    print('Detected object is not dynamic and respondable.')
-            else:
-                pass  # Optionally print 'Robot 0 proximity sensor did not detect any object.'
-
-        # Gripper code for Robot 1
-    if attachedShape1 is None:
-        result1, detectedPoint1, detectedObjectHandle1, detectedSurfaceNormalVector1 = sim.readProximitySensor(objectSensor1)
-        if result1 > 0 and detectedObjectHandle1 != -1:
-            print('Robot 1 proximity sensor detected object:', sim.getObjectName(detectedObjectHandle1))
-            isStatic1 = sim.getObjectInt32Parameter(detectedObjectHandle1, sim.shapeintparam_static)
-            isRespondable1 = sim.getObjectInt32Parameter(detectedObjectHandle1, sim.shapeintparam_respondable)
-            print('Is Static:', isStatic1, 'Is Respondable:', isRespondable1)
-            if isStatic1 == 0 and isRespondable1 != 0:
-                # Attach the detected object to the gripper
-                attachedShape1 = detectedObjectHandle1
-                sim.setObjectParent(attachedShape1, connector1, True)
-                sim.writeCustomDataBlock(attachedShape1, 'attached', 'true')
-                print('Robot 1 object attached:', sim.getObjectName(attachedShape1))
-            else:
-                print('Detected object is not dynamic and respondable.')
-        else:
-            pass  # Optionally print 'Robot 1 proximity sensor did not detect any object.'
-
 
     plt.ion()
     fig, ax = plt.subplots()
